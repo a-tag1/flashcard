@@ -283,6 +283,26 @@
                 </div>
             </div>
 
+            <div class="app-card p-6 rounded-2xl space-y-4">
+                <div>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">カスタムテーマ</h3>
+                    <label for="custom-theme-select" class="block text-sm font-medium mb-2">保存済みテーマ</label>
+                    <select id="custom-theme-select" onchange="selectCustomTheme(this.value)" class="w-full input-styled rounded-xl p-3 text-sm">
+                        <option value="">新しいテーマを作成</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="custom-theme-name" class="block text-sm font-medium mb-2">テーマ名</label>
+                    <input id="custom-theme-name" type="text" maxlength="40" class="w-full input-styled rounded-xl p-3 text-sm" placeholder="例：Ocean">
+                </div>
+                <div id="custom-theme-colors" class="space-y-3"></div>
+                <p class="text-xs text-[var(--text-muted)]">色を変更するとプレビューされます。保存するとテーマ一覧に追加・更新されます。</p>
+                <div class="flex gap-3">
+                    <button onclick="saveCustomTheme()" class="flex-1 py-3 rounded-xl text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary);">テーマを保存</button>
+                    <button id="delete-custom-theme" onclick="deleteCustomTheme()" class="hidden px-4 py-3 rounded-xl border border-red-300 text-red-500 font-semibold">削除</button>
+                </div>
+            </div>
+
             <div class="app-card p-6 rounded-2xl">
                 <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">フォントスタイル</h3>
                 <div class="space-y-3">
@@ -438,11 +458,39 @@
             settings: { theme: 'light', font: 'font-sans' }
         };
 
+        const CUSTOM_THEME_DEFAULTS = {
+            bgBase: '#f3f4f6',
+            bgCard: '#ffffff',
+            bgNav: '#ffffff',
+            textMain: '#1f2937',
+            textMuted: '#6b7280',
+            primary: '#4f46e5',
+            primaryLight: '#e0e7ff',
+            border: '#e5e7eb',
+            shadowCard: '#000000',
+            shadowFlip: '#000000'
+        };
+        const CUSTOM_THEME_COLORS = [
+            { key: 'bgBase', property: '--bg-base', label: '背景' },
+            { key: 'bgCard', property: '--bg-card', label: 'カード背景' },
+            { key: 'bgNav', property: '--bg-nav', label: 'ナビゲーション背景' },
+            { key: 'textMain', property: '--text-main', label: '文字（メイン）' },
+            { key: 'textMuted', property: '--text-muted', label: '文字（補助）' },
+            { key: 'primary', property: '--primary', label: 'アクセント' },
+            { key: 'primaryLight', property: '--primary-light', label: 'アクセント背景' },
+            { key: 'border', property: '--border', label: '境界線' },
+            { key: 'shadowCard', property: '--shadow-card', label: 'カードの影' },
+            { key: 'shadowFlip', property: '--shadow-flip', label: 'フリップの影' }
+        ];
+
         let state = null;
+        let customThemeDraft = { ...CUSTOM_THEME_DEFAULTS };
+        let customThemeDraftId = null;
         let studySession = { activePlaylistId: null, filteredCards: [], currentIndex: 0, isFlipped: false };
 
         function init() {
             loadData();
+            renderCustomThemeEditor();
             applySettings();
             navigate('learn');
         }
@@ -466,8 +514,167 @@
             if (!state.settings) state.settings = { theme: 'light', font: 'font-sans' };
             if (!state.settings.theme) state.settings.theme = 'light';
             if (!state.settings.font) state.settings.font = 'font-sans';
+            if (!Array.isArray(state.settings.customThemes)) state.settings.customThemes = [];
+            state.settings.customThemes = state.settings.customThemes
+                .filter(theme => theme && typeof theme.id === 'string' && typeof theme.name === 'string')
+                .map(theme => ({ id: theme.id, name: theme.name, colors: normalizeCustomThemeColors(theme.colors) }));
+            if (!state.settings.customThemes.some(theme => theme.id === state.settings.activeCustomThemeId)) {
+                state.settings.activeCustomThemeId = null;
+                if (state.settings.theme === 'custom') state.settings.theme = 'light';
+            }
             
             saveData();
+        }
+
+        function normalizeCustomThemeColors(colors) {
+            const normalized = { ...CUSTOM_THEME_DEFAULTS };
+            if (!colors || typeof colors !== 'object') return normalized;
+            CUSTOM_THEME_COLORS.forEach(({ key }) => {
+                if (isHexColor(colors[key])) normalized[key] = colors[key];
+            });
+            return normalized;
+        }
+
+        function isHexColor(value) {
+            return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+        }
+
+        function renderCustomThemeEditor() {
+            const select = document.getElementById('custom-theme-select');
+            const colorContainer = document.getElementById('custom-theme-colors');
+            select.querySelectorAll('option:not(:first-child)').forEach(option => option.remove());
+            state.settings.customThemes.forEach(theme => {
+                const option = document.createElement('option');
+                option.value = theme.id;
+                option.textContent = theme.name;
+                select.appendChild(option);
+            });
+            colorContainer.innerHTML = CUSTOM_THEME_COLORS.map(({ key, label }) => `
+                <label class="flex items-center justify-between gap-3 text-sm">
+                    <span>${label}</span>
+                    <span class="flex items-center gap-2">
+                        <input type="color" data-color-key="${key}" aria-label="${label}の色"
+                            oninput="updateCustomThemeColor('${key}', this.value, 'picker')"
+                            class="w-10 h-10 rounded-lg border border-[var(--border)] bg-transparent cursor-pointer">
+                        <input type="text" data-hex-key="${key}" aria-label="${label}の16進カラーコード"
+                            oninput="updateCustomThemeColor('${key}', this.value, 'hex')"
+                            maxlength="7" pattern="#[0-9a-fA-F]{6}" placeholder="#RRGGBB"
+                            class="w-24 input-styled rounded-lg p-2 text-xs font-mono uppercase">
+                    </span>
+                </label>
+            `).join('');
+
+            const activeTheme = state.settings.customThemes.find(theme => theme.id === state.settings.activeCustomThemeId);
+            customThemeDraftId = activeTheme ? activeTheme.id : null;
+            customThemeDraft = activeTheme ? { ...activeTheme.colors } : { ...CUSTOM_THEME_DEFAULTS };
+            select.value = customThemeDraftId || '';
+            document.getElementById('custom-theme-name').value = activeTheme ? activeTheme.name : '';
+            document.getElementById('delete-custom-theme').classList.toggle('hidden', !activeTheme);
+            syncCustomThemeInputs();
+        }
+
+        function syncCustomThemeInputs() {
+            CUSTOM_THEME_COLORS.forEach(({ key }) => {
+                document.querySelector(`[data-color-key="${key}"]`).value = customThemeDraft[key];
+                const hexInput = document.querySelector(`[data-hex-key="${key}"]`);
+                hexInput.value = customThemeDraft[key];
+                hexInput.classList.remove('border-red-500');
+                hexInput.removeAttribute('aria-invalid');
+            });
+        }
+
+        function selectCustomTheme(id) {
+            const theme = state.settings.customThemes.find(item => item.id === id);
+            customThemeDraftId = theme ? theme.id : null;
+            customThemeDraft = theme ? { ...theme.colors } : { ...CUSTOM_THEME_DEFAULTS };
+            document.getElementById('custom-theme-name').value = theme ? theme.name : '';
+            document.getElementById('delete-custom-theme').classList.toggle('hidden', !theme);
+            syncCustomThemeInputs();
+            if (theme) {
+                state.settings.activeCustomThemeId = theme.id;
+                state.settings.theme = 'custom';
+                saveData();
+            }
+            if (theme) applySettings();
+            else applyCustomThemeColors(customThemeDraft);
+        }
+
+        function updateCustomThemeColor(key, value, source) {
+            const field = CUSTOM_THEME_COLORS.find(color => color.key === key);
+            if (!field) return;
+            const hexInput = document.querySelector(`[data-hex-key="${key}"]`);
+            if (!isHexColor(value)) {
+                if (source === 'hex') {
+                    hexInput.classList.add('border-red-500');
+                    hexInput.setAttribute('aria-invalid', 'true');
+                }
+                return;
+            }
+            const normalized = value.toLowerCase();
+            customThemeDraft[key] = normalized;
+            document.querySelector(`[data-color-key="${key}"]`).value = normalized;
+            hexInput.value = normalized;
+            hexInput.classList.remove('border-red-500');
+            hexInput.removeAttribute('aria-invalid');
+            applyCustomThemeColors(customThemeDraft);
+        }
+
+        function applyCustomThemeColors(colors) {
+            document.body.className = document.body.className.replace(/theme-\w+/g, '').trim();
+            CUSTOM_THEME_COLORS.forEach(({ key, property }) => {
+                let value = colors[key];
+                if (key === 'bgNav') value = hexToRgb(colors[key], 0.85);
+                if (key === 'shadowCard') {
+                    value = `0 10px 25px -5px ${hexToRgb(colors[key], 0.08)}, 0 8px 10px -6px ${hexToRgb(colors[key], 0.02)}`;
+                }
+                if (key === 'shadowFlip') value = `0 25px 50px -12px ${hexToRgb(colors[key], 0.15)}`;
+                document.body.style.setProperty(property, value);
+            });
+            const metaTheme = document.querySelector('meta[name="theme-color"]');
+            if (metaTheme) metaTheme.content = colors.bgBase;
+        }
+
+        function hexToRgb(hex, alpha) {
+            const value = hex.slice(1);
+            const red = parseInt(value.slice(0, 2), 16);
+            const green = parseInt(value.slice(2, 4), 16);
+            const blue = parseInt(value.slice(4, 6), 16);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        }
+
+        function saveCustomTheme() {
+            const name = document.getElementById('custom-theme-name').value.trim();
+            if (!name) return showToast('テーマ名を入力してください');
+            if (document.querySelector('[aria-invalid="true"]')) return showToast('カラーコードを確認してください');
+
+            let theme = state.settings.customThemes.find(item => item.id === customThemeDraftId);
+            if (theme) {
+                theme.name = name;
+                theme.colors = { ...customThemeDraft };
+            } else {
+                theme = { id: generateId(), name, colors: { ...customThemeDraft } };
+                state.settings.customThemes.push(theme);
+                customThemeDraftId = theme.id;
+            }
+            state.settings.activeCustomThemeId = theme.id;
+            state.settings.theme = 'custom';
+            saveData();
+            renderCustomThemeEditor();
+            applySettings();
+            showToast('カスタムテーマを保存しました');
+        }
+
+        function deleteCustomTheme() {
+            if (!customThemeDraftId) return;
+            showConfirm('テーマ削除', 'このカスタムテーマを削除しますか？', () => {
+                state.settings.customThemes = state.settings.customThemes.filter(theme => theme.id !== customThemeDraftId);
+                state.settings.activeCustomThemeId = null;
+                state.settings.theme = 'light';
+                saveData();
+                renderCustomThemeEditor();
+                applySettings();
+                showToast('カスタムテーマを削除しました');
+            });
         }
 
         function saveData() {
@@ -916,7 +1123,16 @@
 
         function applySettings() {
             document.body.className = document.body.className.replace(/theme-\w+/g, '').trim();
-            if (state.settings.theme !== 'light') {
+            CUSTOM_THEME_COLORS.forEach(({ property }) => document.body.style.removeProperty(property));
+            if (state.settings.theme === 'custom') {
+                const activeTheme = state.settings.customThemes.find(theme => theme.id === state.settings.activeCustomThemeId);
+                if (activeTheme) {
+                    applyCustomThemeColors(activeTheme.colors);
+                } else {
+                    state.settings.theme = 'light';
+                    state.settings.activeCustomThemeId = null;
+                }
+            } else if (state.settings.theme !== 'light') {
                 document.body.classList.add(`theme-${state.settings.theme}`);
             }
             document.body.className = document.body.className.replace(/font-(sans|serif|rounded)/g, '').trim();
@@ -930,7 +1146,10 @@
                 document.head.appendChild(metaTheme);
             }
             const bgColors = { light: '#f3f4f6', dark: '#111827', pastel: '#fdf4f5', neon: '#09090b' };
-            metaTheme.content = bgColors[state.settings.theme] || '#f3f4f6';
+            const activeTheme = state.settings.customThemes.find(theme => theme.id === state.settings.activeCustomThemeId);
+            metaTheme.content = state.settings.theme === 'custom' && activeTheme
+                ? activeTheme.colors.bgBase
+                : (bgColors[state.settings.theme] || '#f3f4f6');
         }
 
         window.onload = init;
