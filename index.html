@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modern Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* =========================================
+           テーマ定義 (CSS Custom Properties)
+        ========================================= */
+        :root {
+            --bg-base: #f3f4f6;
+            --bg-card: #ffffff;
+            --bg-nav: rgba(255, 255, 255, 0.85);
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --border: #e5e7eb;
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            --shadow-flip: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        }
+
+        .theme-dark {
+            --bg-base: #111827;
+            --bg-card: #1f2937;
+            --bg-nav: rgba(31, 41, 55, 0.85);
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --primary: #6366f1;
+            --primary-light: rgba(99, 102, 241, 0.2);
+            --border: #374151;
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            --shadow-flip: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            color-scheme: dark;
+        }
+
+        .theme-pastel {
+            --bg-base: #fdf4f5;
+            --bg-card: #ffffff;
+            --bg-nav: rgba(255, 255, 255, 0.9);
+            --text-main: #57534e;
+            --text-muted: #a8a29e;
+            --primary: #f472b6;
+            --primary-light: #fce7f3;
+            --border: #f5d0fe;
+            --shadow-card: 0 10px 25px -5px rgba(244, 114, 182, 0.1);
+            --shadow-flip: 0 25px 50px -12px rgba(244, 114, 182, 0.2);
+        }
+
+        .theme-neon {
+            --bg-base: #09090b;
+            --bg-card: #18181b;
+            --bg-nav: rgba(24, 24, 27, 0.85);
+            --text-main: #ecfeff;
+            --text-muted: #a1a1aa;
+            --primary: #22d3ee;
+            --primary-light: rgba(34, 211, 238, 0.15);
+            --border: #22d3ee;
+            --shadow-card: 0 0 15px rgba(34, 211, 238, 0.2);
+            --shadow-flip: 0 0 40px rgba(34, 211, 238, 0.4);
+            color-scheme: dark;
+        }
+
+        /* =========================================
+           グローバルスタイル
+        ========================================= */
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-nav {
+            background-color: var(--bg-nav);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border);
+        }
+
+        .app-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            transition: all 0.3s ease;
+        }
+
+        .input-styled {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+        }
+        .input-styled:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        /* フォント定義 */
+        .font-sans { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+        .font-serif { font-family: ui-serif, Georgia, Cambria, serif; }
+        .font-rounded { font-family: 'Quicksand', 'Varela Round', system-ui, sans-serif; letter-spacing: 0.02em; }
+
+        /* =========================================
+           3D フリップアニメーション
+        ========================================= */
+        .perspective-1000 { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .card-inner {
+            transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); /* バウンドするような心地よいイージング */
+        }
+        .flashcard-surface {
+            box-shadow: var(--shadow-flip);
+        }
+
+        /* スクロールバー非表示 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* モーダルのフェードイン */
+        .fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- ヘッダー -->
+    <header class="pt-6 pb-4 px-6 flex justify-between items-center z-10 shrink-0">
+        <h1 class="text-2xl font-extrabold tracking-tight" style="color: var(--primary);">FLASHCARDS</h1>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 overflow-y-auto no-scrollbar px-5 pb-28 relative" id="main-content">
+        
+        <!-- ==========================================
+             View 1: Learn (プレイリスト選択)
+        =========================================== -->
+        <div id="view-learn" class="space-y-6 pb-8 view-section">
+            <h2 class="text-lg font-semibold text-[var(--text-muted)]">SMALL STEP</h2>
+            <div id="learn-playlist-container" class="grid grid-cols-1 gap-5">
+                <!-- JS生成 -->
+            </div>
+        </div>
+
+        <!-- ==========================================
+             View 1-b: Study (学習画面)
+        =========================================== -->
+        <div id="view-study" class="hidden h-full flex flex-col view-section">
+            <!-- ヘッダーコントロール -->
+            <div class="mb-4 space-y-3 shrink-0">
+                <div class="flex justify-between items-center">
+                    <button onclick="navigate('learn')" class="flex items-center gap-1 py-2 font-medium text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        戻る
+                    </button>
+                    <div class="px-3 py-1 rounded-full text-sm font-semibold app-card" id="study-progress">1 / 10</div>
+                </div>
+                <!-- フィルター -->
+                <div class="flex gap-3">
+                    <select id="filter-mastery" onchange="applyFilters()" class="flex-1 input-styled rounded-xl p-2.5 text-sm appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');">
+                        <option value="all">全レベル</option>
+                        <option value="0">🔴 未学習</option>
+                        <option value="1">🟡 学習中</option>
+                        <option value="2">🟢 習得済</option>
+                    </select>
+                    <select id="filter-genre" onchange="applyFilters()" class="flex-1 input-styled rounded-xl p-2.5 text-sm appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');">
+                        <option value="all">全ジャンル</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- カードエリア -->
+            <div id="no-cards-message" class="hidden flex-1 flex flex-col items-center justify-center text-[var(--text-muted)]">
+                <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <p>対象のカードがありません</p>
+            </div>
+
+            <div id="card-area" class="flex-1 flex flex-col justify-center perspective-1000 w-full max-w-md mx-auto">
+                <!-- 3Dカード本体 -->
+                <div id="flashcard" class="relative w-full aspect-[3/4] max-h-[60vh] preserve-3d card-inner cursor-pointer" onclick="flipCard()">
+                    
+                    <!-- 表面 -->
+                    <div class="absolute inset-0 w-full h-full backface-hidden app-card flashcard-surface rounded-[2rem] flex flex-col items-center justify-center p-8 text-center">
+                        <span id="card-genre" class="absolute top-6 left-6 text-xs font-bold px-3 py-1 rounded-full text-white" style="background-color: var(--primary);">Genre</span>
+                        <div class="absolute top-6 right-6 text-xl" id="card-front-mastery"></div>
+                        
+                        <h2 id="card-front" class="text-4xl md:text-5xl font-bold mb-6 break-words w-full text-[var(--text-main)] leading-tight">Word</h2>
+                        
+                        <div class="absolute bottom-8 flex items-center gap-2 text-[var(--text-muted)] opacity-60">
+                            <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                            <span class="text-sm font-medium tracking-wide uppercase">Tap to flip</span>
+                        </div>
+                    </div>
+
+                    <!-- 裏面 -->
+                    <div class="absolute inset-0 w-full h-full backface-hidden app-card flashcard-surface rounded-[2rem] flex flex-col p-6 text-center rotate-y-180">
+                        <div class="flex-1 flex items-center justify-center">
+                            <h3 id="card-back" class="text-3xl font-medium break-words w-full text-[var(--text-main)]">Meaning</h3>
+                        </div>
+                        
+                        <!-- 習得度ボタン -->
+                        <div class="mt-auto pt-6 border-t border-[var(--border)]" onclick="event.stopPropagation()">
+                            <p class="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wider">Mastery Level</p>
+                            <div class="flex gap-2">
+                                <button onclick="setMastery(0)" id="btn-mastery-0" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-red-400 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">🔴 未学習</button>
+                                <button onclick="setMastery(1)" id="btn-mastery-1" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-yellow-400 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30">🟡 学習中</button>
+                                <button onclick="setMastery(2)" id="btn-mastery-2" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-green-400 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30">🟢 習得済</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ナビゲーション -->
+                <div class="flex justify-center items-center mt-10 gap-6">
+                    <button onclick="prevCard()" class="p-4 rounded-full app-card hover:scale-110 active:scale-95 transition-transform text-[var(--text-main)]">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button onclick="nextCard()" class="p-4 rounded-full app-card hover:scale-110 active:scale-95 transition-transform text-white" style="background-color: var(--primary); border-color: var(--primary);">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             View 2: Playlists (プレイリスト管理)
+        =========================================== -->
+        <div id="view-playlists" class="hidden space-y-6 pb-8 view-section">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-[var(--text-muted)]">プレイリスト</h2>
+                <button onclick="openPlaylistModal()" class="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold text-sm shadow-lg hover:opacity-90 active:scale-95 transition-all" style="background-color: var(--primary);">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    新規作成
+                </button>
+            </div>
+            <div id="manage-playlist-container" class="space-y-4">
+                <!-- JS生成 -->
+            </div>
+        </div>
+
+        <!-- ==========================================
+             View 3: Words (単語管理)
+        =========================================== -->
+        <div id="view-words" class="hidden space-y-4 h-full flex flex-col view-section">
+            <div class="flex justify-between items-center shrink-0">
+                <h2 class="text-lg font-semibold text-[var(--text-muted)]">単語一覧</h2>
+                <button onclick="openWordModal()" class="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-semibold text-sm shadow-lg hover:opacity-90 active:scale-95 transition-all" style="background-color: var(--primary);">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    追加
+                </button>
+            </div>
+            <div class="shrink-0 mb-2">
+                <select id="manage-word-filter" onchange="renderManageWords()" class="w-full input-styled rounded-xl p-3 text-sm font-medium appearance-none bg-no-repeat bg-[right_1rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');">
+                    <option value="all">全てのプレイリスト</option>
+                </select>
+            </div>
+            <div id="manage-word-container" class="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-6">
+                <!-- JS生成 -->
+            </div>
+        </div>
+
+        <!-- ==========================================
+             View 4: Settings (設定)
+        =========================================== -->
+        <div id="view-settings" class="hidden space-y-8 pb-8 view-section">
+            <h2 class="text-lg font-semibold text-[var(--text-muted)]">設定</h2>
+            
+            <div class="app-card p-6 rounded-2xl">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">カラーテーマ</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="setTheme('light')" class="py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 font-medium hover:ring-2 hover:ring-offset-2 ring-blue-500 transition-all">Light</button>
+                    <button onclick="setTheme('dark')" class="py-3 rounded-xl border border-gray-700 bg-gray-900 text-gray-100 font-medium hover:ring-2 hover:ring-offset-2 hover:ring-offset-gray-900 ring-indigo-500 transition-all">Dark</button>
+                    <button onclick="setTheme('pastel')" class="py-3 rounded-xl border border-pink-200 bg-pink-50 text-pink-700 font-medium hover:ring-2 hover:ring-offset-2 ring-pink-400 transition-all">Pastel</button>
+                    <button onclick="setTheme('neon')" class="py-3 rounded-xl border border-cyan-500 bg-black text-cyan-400 font-medium hover:ring-2 hover:ring-offset-2 hover:ring-offset-black ring-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.3)] transition-all">Neon</button>
+                </div>
+            </div>
+
+            <div class="app-card p-6 rounded-2xl">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">フォントスタイル</h3>
+                <div class="space-y-3">
+                    <label class="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--primary-light)] transition-colors">
+                        <span class="font-sans font-medium">Standard (Sans-serif)</span>
+                        <input type="radio" name="font" value="font-sans" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
+                    </label>
+                    <label class="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--primary-light)] transition-colors">
+                        <span class="font-serif font-medium">Elegant (Serif)</span>
+                        <input type="radio" name="font" value="font-serif" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
+                    </label>
+                    <label class="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--primary-light)] transition-colors">
+                        <span class="font-rounded font-medium">Friendly (Rounded)</span>
+                        <input type="radio" name="font" value="font-rounded" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
+                    </label>
+                </div>
+            </div>
+
+            <div class="text-center pt-4">
+                <button onclick="confirmReset()" class="text-red-500 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                    全データを初期化
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 下部ナビゲーション -->
+    <nav class="absolute bottom-0 w-full glass-nav pb-safe pt-2 px-6 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+        <div class="flex justify-between items-center max-w-md mx-auto pb-4">
+            <button onclick="navigate('learn')" class="nav-btn flex flex-col items-center p-2 text-[var(--text-muted)] transition-all duration-300" id="nav-learn">
+                <div class="icon-wrapper p-2 rounded-xl mb-1 transition-all">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                </div>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Learn</span>
+            </button>
+            <button onclick="navigate('playlists')" class="nav-btn flex flex-col items-center p-2 text-[var(--text-muted)] transition-all duration-300" id="nav-playlists">
+                <div class="icon-wrapper p-2 rounded-xl mb-1 transition-all">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                </div>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Lists</span>
+            </button>
+            <button onclick="navigate('words')" class="nav-btn flex flex-col items-center p-2 text-[var(--text-muted)] transition-all duration-300" id="nav-words">
+                <div class="icon-wrapper p-2 rounded-xl mb-1 transition-all">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </div>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Words</span>
+            </button>
+            <button onclick="navigate('settings')" class="nav-btn flex flex-col items-center p-2 text-[var(--text-muted)] transition-all duration-300" id="nav-settings">
+                <div class="icon-wrapper p-2 rounded-xl mb-1 transition-all">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </div>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ==========================================
+         カスタムモーダル・コンポーネント
+    =========================================== -->
+    <!-- プレイリスト追加/編集モーダル -->
+    <div id="modal-playlist" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="app-card w-full max-w-sm p-6 rounded-3xl transform scale-95 transition-transform duration-300" id="modal-playlist-content">
+            <h3 class="text-xl font-bold mb-6 text-[var(--text-main)]" id="modal-playlist-title">プレイリスト</h3>
+            <input type="hidden" id="modal-playlist-id">
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">名前</label>
+                <input type="text" id="modal-playlist-name" class="w-full input-styled p-3 rounded-xl" placeholder="例: 日常英会話">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('modal-playlist')" class="px-5 py-2.5 font-semibold text-[var(--text-muted)] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">キャンセル</button>
+                <button onclick="savePlaylist()" class="px-5 py-2.5 font-semibold text-white rounded-xl shadow-lg transition-transform active:scale-95" style="background-color: var(--primary);">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 単語追加/編集モーダル -->
+    <div id="modal-word" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="app-card w-full max-w-sm p-6 rounded-3xl max-h-[90vh] overflow-y-auto no-scrollbar transform scale-95 transition-transform duration-300" id="modal-word-content">
+            <h3 class="text-xl font-bold mb-6 text-[var(--text-main)]" id="modal-word-title">単語</h3>
+            <input type="hidden" id="modal-word-id">
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">対象プレイリスト</label>
+                    <select id="modal-word-playlist" class="w-full input-styled p-3 rounded-xl appearance-none"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">表面 (単語)</label>
+                    <textarea id="modal-word-front" rows="2" class="w-full input-styled p-3 rounded-xl resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">裏面 (意味)</label>
+                    <textarea id="modal-word-back" rows="2" class="w-full input-styled p-3 rounded-xl resize-none"></textarea>
+                </div>
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">ジャンル</label>
+                        <input type="text" id="modal-word-genre" class="w-full input-styled p-3 rounded-xl" placeholder="例: 動詞">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">習得度</label>
+                        <select id="modal-word-mastery" class="w-full input-styled p-3 rounded-xl appearance-none">
+                            <option value="0">🔴 未学習</option>
+                            <option value="1">🟡 学習中</option>
+                            <option value="2">🟢 習得済</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-8">
+                <button onclick="closeModal('modal-word')" class="px-5 py-2.5 font-semibold text-[var(--text-muted)] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">キャンセル</button>
+                <button onclick="saveWord()" class="px-5 py-2.5 font-semibold text-white rounded-xl shadow-lg transition-transform active:scale-95" style="background-color: var(--primary);">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- カスタム確認ダイアログ -->
+    <div id="dialog-confirm" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden flex justify-center items-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="app-card w-full max-w-xs p-6 rounded-3xl text-center transform scale-95 transition-transform duration-300" id="dialog-confirm-content">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold mb-2 text-[var(--text-main)]" id="dialog-confirm-title">確認</h3>
+            <p class="text-sm text-[var(--text-muted)] mb-6" id="dialog-confirm-msg">実行しますか？</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeConfirm()" class="flex-1 py-2.5 font-semibold bg-gray-100 dark:bg-gray-800 text-[var(--text-main)] rounded-xl">キャンセル</button>
+                <button id="dialog-confirm-btn" class="flex-1 py-2.5 font-semibold bg-red-500 text-white rounded-xl shadow-lg">実行</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- カスタムトースト通知 -->
+    <div id="toast" class="fixed top-10 left-1/2 transform -translate-x-1/2 bg-[var(--text-main)] text-[var(--bg-base)] px-6 py-3 rounded-full shadow-2xl z-[70] font-medium text-sm transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px]">
+        Message
+    </div>
+
+    <script>
+        // --- データの初期化 ---
+        const SAMPLE_DATA = {
+            playlists: [
+                { id: 'p1', name: '基本英単語 (TOEIC)' },
+                { id: 'p2', name: '日常会話フレーズ' }
+            ],
+            cards: [
+                { id: 'c1', playlistId: 'p1', front: 'Accommodate', back: '収容する、適応させる', genre: '動詞', mastery: 0 },
+                { id: 'c2', playlistId: 'p1', front: 'Substantial', back: 'かなりの、実質的な', genre: '形容詞', mastery: 1 },
+                { id: 'c3', playlistId: 'p1', front: 'Implement', back: '実行する、導入する', genre: '動詞', mastery: 2 },
+                { id: 'c5', playlistId: 'p2', front: 'How\'s it going?', back: '調子はどう？', genre: '挨拶', mastery: 2 },
+                { id: 'c6', playlistId: 'p2', front: 'Make sense', back: '理にかなっている', genre: '熟語', mastery: 0 }
+            ],
+            settings: { theme: 'light', font: 'font-sans' }
+        };
+
+        let state = null;
+        let studySession = { activePlaylistId: null, filteredCards: [], currentIndex: 0, isFlipped: false };
+
+        function init() {
+            loadData();
+            applySettings();
+            navigate('learn');
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('modernFlashcardApp');
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch (e) {
+                    state = JSON.parse(JSON.stringify(SAMPLE_DATA));
+                }
+            } else {
+                state = JSON.parse(JSON.stringify(SAMPLE_DATA));
+            }
+            
+            // 安全な初期化 (Cannot read properties of undefined 対策)
+            if (!state) state = { playlists: [], cards: [], settings: {} };
+            if (!state.playlists) state.playlists = [];
+            if (!state.cards) state.cards = [];
+            if (!state.settings) state.settings = { theme: 'light', font: 'font-sans' };
+            if (!state.settings.theme) state.settings.theme = 'light';
+            if (!state.settings.font) state.settings.font = 'font-sans';
+            
+            saveData();
+        }
+
+        function saveData() {
+            localStorage.setItem('modernFlashcardApp', JSON.stringify(state));
+        }
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+
+        // --- カスタム UI コンポーネント (alert/confirm の代替) ---
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('opacity-0', 'translate-y-[-20px]');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-[-20px]');
+            }, 2500);
+        }
+
+        let confirmCallback = null;
+        function showConfirm(title, msg, callback) {
+            confirmCallback = callback;
+            document.getElementById('dialog-confirm-title').textContent = title;
+            document.getElementById('dialog-confirm-msg').textContent = msg;
+            
+            const dialog = document.getElementById('dialog-confirm');
+            const content = document.getElementById('dialog-confirm-content');
+            dialog.classList.remove('hidden');
+            
+            // アニメーション用
+            requestAnimationFrame(() => {
+                dialog.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            });
+
+            document.getElementById('dialog-confirm-btn').onclick = () => {
+                closeConfirm();
+                if(confirmCallback) confirmCallback();
+            };
+        }
+
+        function closeConfirm() {
+            const dialog = document.getElementById('dialog-confirm');
+            const content = document.getElementById('dialog-confirm-content');
+            dialog.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => { dialog.classList.add('hidden'); }, 300);
+        }
+
+        function confirmReset() {
+            showConfirm('データ初期化', '全てのデータと設定が消去されます。よろしいですか？', () => {
+                localStorage.removeItem('modernFlashcardApp');
+                location.reload();
+            });
+        }
+
+        // --- ナビゲーション ---
+        function navigate(target) {
+            const views = ['learn', 'study', 'playlists', 'words', 'settings'];
+            views.forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+            });
+            
+            // ナビゲーションボタンのアクティブ状態更新
+            ['learn', 'playlists', 'words', 'settings'].forEach(v => {
+                const btn = document.getElementById(`nav-${v}`);
+                if(btn) {
+                    btn.classList.remove('text-[var(--primary)]');
+                    btn.querySelector('.icon-wrapper').classList.remove('bg-[var(--primary-light)]');
+                }
+            });
+
+            document.getElementById(`view-${target}`).classList.remove('hidden');
+            
+            // Study画面の場合はLearnをアクティブにする
+            const activeNav = target === 'study' ? 'learn' : target;
+            const activeBtn = document.getElementById(`nav-${activeNav}`);
+            if(activeBtn) {
+                activeBtn.classList.add('text-[var(--primary)]');
+                activeBtn.querySelector('.icon-wrapper').classList.add('bg-[var(--primary-light)]');
+            }
+
+            // 画面ごとのレンダリング
+            if (target === 'learn') renderLearn();
+            if (target === 'playlists') renderPlaylists();
+            if (target === 'words') { updateWordFilterOptions(); renderManageWords(); }
+            if (target === 'settings') {
+                const fRadio = document.querySelector(`input[name="font"][value="${state.settings.font}"]`);
+                if(fRadio) fRadio.checked = true;
+            }
+        }
+
+        // --- Learn / Study ---
+        function renderLearn() {
+            const container = document.getElementById('learn-playlist-container');
+            container.innerHTML = '';
+            
+            if(state.playlists.length === 0) {
+                container.innerHTML = `
+                    <div class="app-card p-8 rounded-2xl text-center flex flex-col items-center">
+                        <div class="w-16 h-16 bg-[var(--primary-light)] text-[var(--primary)] rounded-full flex items-center justify-center mb-4"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></div>
+                        <p class="text-[var(--text-muted)] font-medium mb-4">プレイリストがありません</p>
+                        <button onclick="navigate('playlists')" class="text-[var(--primary)] font-bold">作成する</button>
+                    </div>`;
+                return;
+            }
+
+            state.playlists.forEach(pl => {
+                const cards = state.cards.filter(c => c.playlistId === pl.id);
+                const mastered = cards.filter(c => c.mastery === 2).length;
+                const progress = cards.length ? Math.round((mastered / cards.length) * 100) : 0;
+
+                const el = document.createElement('div');
+                el.className = 'app-card p-5 rounded-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-transform';
+                el.onclick = () => startStudy(pl.id);
+                el.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl font-bold text-[var(--text-main)]">${pl.name}</h3>
+                        <span class="text-xs font-bold px-3 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)]">${cards.length} Cards</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-full bg-[var(--border)] rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-[var(--primary)] h-full rounded-full transition-all duration-500" style="width: ${progress}%"></div>
+                        </div>
+                        <span class="text-sm font-bold text-[var(--text-muted)] min-w-[3rem] text-right">${progress}%</span>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function startStudy(playlistId) {
+            studySession.activePlaylistId = playlistId;
+            const pCards = state.cards.filter(c => c.playlistId === playlistId);
+            
+            const genres = [...new Set(pCards.map(c => c.genre).filter(Boolean))];
+            const gSelect = document.getElementById('filter-genre');
+            gSelect.innerHTML = '<option value="all">全ジャンル</option>';
+            genres.forEach(g => { gSelect.innerHTML += `<option value="${g}">${g}</option>`; });
+
+            document.getElementById('filter-mastery').value = 'all';
+            document.getElementById('filter-genre').value = 'all';
+
+            applyFilters();
+            navigate('study');
+        }
+
+        function applyFilters() {
+            const mFilter = document.getElementById('filter-mastery').value;
+            const gFilter = document.getElementById('filter-genre').value;
+            
+            let filtered = state.cards.filter(c => c.playlistId === studySession.activePlaylistId);
+            if (mFilter !== 'all') filtered = filtered.filter(c => c.mastery === parseInt(mFilter));
+            if (gFilter !== 'all') filtered = filtered.filter(c => c.genre === gFilter);
+
+            studySession.filteredCards = filtered;
+            studySession.currentIndex = 0;
+            studySession.isFlipped = false;
+            
+            renderStudyCard();
+        }
+
+        function renderStudyCard() {
+            const cardArea = document.getElementById('card-area');
+            const noMsg = document.getElementById('no-cards-message');
+            const flashcard = document.getElementById('flashcard');
+            
+            flashcard.classList.remove('rotate-y-180');
+            studySession.isFlipped = false;
+
+            if (studySession.filteredCards.length === 0) {
+                cardArea.classList.add('hidden');
+                noMsg.classList.remove('hidden');
+                document.getElementById('study-progress').textContent = '0 / 0';
+                return;
+            }
+
+            cardArea.classList.remove('hidden');
+            noMsg.classList.add('hidden');
+
+            const card = studySession.filteredCards[studySession.currentIndex];
+            document.getElementById('card-front').textContent = card.front;
+            document.getElementById('card-back').textContent = card.back;
+            
+            const genreEl = document.getElementById('card-genre');
+            if (card.genre) { genreEl.textContent = card.genre; genreEl.style.display = 'block'; } 
+            else { genreEl.style.display = 'none'; }
+
+            const masteryIcons = ['🔴', '🟡', '🟢'];
+            document.getElementById('card-front-mastery').textContent = masteryIcons[card.mastery] || '🔴';
+            document.getElementById('study-progress').textContent = `${studySession.currentIndex + 1} / ${studySession.filteredCards.length}`;
+
+            updateMasteryUI(card.mastery);
+        }
+
+        function flipCard() {
+            studySession.isFlipped = !studySession.isFlipped;
+            document.getElementById('flashcard').classList.toggle('rotate-y-180', studySession.isFlipped);
+        }
+
+        function nextCard() {
+            if (studySession.filteredCards.length === 0) return;
+            studySession.currentIndex = (studySession.currentIndex + 1) % studySession.filteredCards.length;
+            renderStudyCard();
+        }
+
+        function prevCard() {
+            if (studySession.filteredCards.length === 0) return;
+            studySession.currentIndex = (studySession.currentIndex - 1 + studySession.filteredCards.length) % studySession.filteredCards.length;
+            renderStudyCard();
+        }
+
+        function setMastery(level) {
+            const card = studySession.filteredCards[studySession.currentIndex];
+            card.mastery = level;
+            
+            const idx = state.cards.findIndex(c => c.id === card.id);
+            if(idx !== -1) {
+                state.cards[idx].mastery = level;
+                saveData();
+            }
+            updateMasteryUI(level);
+            setTimeout(() => nextCard(), 300); 
+        }
+
+        function updateMasteryUI(level) {
+            [0, 1, 2].forEach(i => {
+                const btn = document.getElementById(`btn-mastery-${i}`);
+                btn.classList.remove('bg-red-50', 'bg-yellow-50', 'bg-green-50', 'bg-red-900/30', 'bg-yellow-900/30', 'bg-green-900/30', 'ring-2');
+                if (i === level) {
+                    if(i===0) btn.classList.add(state.settings.theme === 'dark' ? 'bg-red-900/30' : 'bg-red-50', 'ring-2', 'ring-red-300');
+                    if(i===1) btn.classList.add(state.settings.theme === 'dark' ? 'bg-yellow-900/30' : 'bg-yellow-50', 'ring-2', 'ring-yellow-300');
+                    if(i===2) btn.classList.add(state.settings.theme === 'dark' ? 'bg-green-900/30' : 'bg-green-50', 'ring-2', 'ring-green-300');
+                }
+            });
+        }
+
+        // --- Playlists Management ---
+        function renderPlaylists() {
+            const container = document.getElementById('manage-playlist-container');
+            container.innerHTML = '';
+            state.playlists.forEach(pl => {
+                const count = state.cards.filter(c => c.playlistId === pl.id).length;
+                const el = document.createElement('div');
+                el.className = 'app-card p-4 rounded-2xl flex justify-between items-center';
+                el.innerHTML = `
+                    <div>
+                        <h4 class="font-bold text-lg text-[var(--text-main)]">${pl.name}</h4>
+                        <p class="text-sm font-medium text-[var(--text-muted)]">${count} Cards</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openPlaylistModal('${pl.id}')" class="p-3 rounded-xl bg-[var(--primary-light)] text-[var(--primary)] hover:scale-105 active:scale-95 transition-transform"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                        <button onclick="reqDeletePlaylist('${pl.id}')" class="p-3 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-500 hover:scale-105 active:scale-95 transition-transform"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function openPlaylistModal(id = null) {
+            const modal = document.getElementById('modal-playlist');
+            const content = document.getElementById('modal-playlist-content');
+            modal.classList.remove('hidden');
+            
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            });
+
+            if (id) {
+                const pl = state.playlists.find(p => p.id === id);
+                document.getElementById('modal-playlist-title').textContent = 'プレイリスト編集';
+                document.getElementById('modal-playlist-id').value = pl.id;
+                document.getElementById('modal-playlist-name').value = pl.name;
+            } else {
+                document.getElementById('modal-playlist-title').textContent = '新規プレイリスト';
+                document.getElementById('modal-playlist-id').value = '';
+                document.getElementById('modal-playlist-name').value = '';
+            }
+        }
+
+        function savePlaylist() {
+            const id = document.getElementById('modal-playlist-id').value;
+            const name = document.getElementById('modal-playlist-name').value.trim();
+            if(!name) return showToast('名前を入力してください');
+            
+            if (id) {
+                const pl = state.playlists.find(p => p.id === id);
+                if(pl) pl.name = name;
+                showToast('更新しました');
+            } else {
+                state.playlists.push({ id: generateId(), name });
+                showToast('作成しました');
+            }
+            saveData();
+            closeModal('modal-playlist');
+            renderPlaylists();
+        }
+
+        function reqDeletePlaylist(id) {
+            showConfirm('プレイリスト削除', 'このリストと含まれる全ての単語を削除しますか？', () => {
+                state.playlists = state.playlists.filter(p => p.id !== id);
+                state.cards = state.cards.filter(c => c.playlistId !== id);
+                saveData();
+                renderPlaylists();
+                showToast('削除しました');
+            });
+        }
+
+        // --- Words Management ---
+        function updateWordFilterOptions() {
+            const sel = document.getElementById('manage-word-filter');
+            sel.innerHTML = '<option value="all">全てのプレイリスト</option>';
+            state.playlists.forEach(pl => {
+                sel.innerHTML += `<option value="${pl.id}">${pl.name}</option>`;
+            });
+        }
+
+        function renderManageWords() {
+            const container = document.getElementById('manage-word-container');
+            const fId = document.getElementById('manage-word-filter').value;
+            container.innerHTML = '';
+            
+            let dCards = state.cards;
+            if (fId !== 'all') dCards = dCards.filter(c => c.playlistId === fId);
+
+            dCards.forEach(c => {
+                const pl = state.playlists.find(p => p.id === c.playlistId);
+                const plName = pl ? pl.name : 'Unknown';
+                const mIcon = c.mastery === 2 ? '🟢' : (c.mastery === 1 ? '🟡' : '🔴');
+
+                const el = document.createElement('div');
+                el.className = 'app-card p-4 rounded-2xl flex justify-between items-center gap-3';
+                el.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="flex gap-2 items-center mb-2">
+                            <span class="text-[10px] font-bold tracking-wider uppercase bg-[var(--border)] text-[var(--text-muted)] px-2 py-1 rounded truncate max-w-[100px]">${plName}</span>
+                            <span class="text-xs">${mIcon}</span>
+                        </div>
+                        <p class="font-bold text-lg text-[var(--text-main)] truncate">${c.front}</p>
+                        <p class="text-sm font-medium text-[var(--text-muted)] truncate">${c.back}</p>
+                    </div>
+                    <div class="flex flex-col gap-2 shrink-0">
+                        <button onclick="openWordModal('${c.id}')" class="p-2.5 rounded-xl bg-[var(--primary-light)] text-[var(--primary)] hover:scale-105 active:scale-95 transition-transform"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                        <button onclick="reqDeleteWord('${c.id}')" class="p-2.5 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-500 hover:scale-105 active:scale-95 transition-transform"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function openWordModal(id = null) {
+            if(state.playlists.length === 0) return showToast('先にプレイリストを作成してください');
+            
+            const modal = document.getElementById('modal-word');
+            const content = document.getElementById('modal-word-content');
+            modal.classList.remove('hidden');
+            
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            });
+
+            const sel = document.getElementById('modal-word-playlist');
+            sel.innerHTML = '';
+            state.playlists.forEach(pl => { sel.innerHTML += `<option value="${pl.id}">${pl.name}</option>`; });
+
+            if (id) {
+                const c = state.cards.find(x => x.id === id);
+                document.getElementById('modal-word-title').textContent = '単語編集';
+                document.getElementById('modal-word-id').value = c.id;
+                sel.value = c.playlistId;
+                document.getElementById('modal-word-front').value = c.front;
+                document.getElementById('modal-word-back').value = c.back;
+                document.getElementById('modal-word-genre').value = c.genre || '';
+                document.getElementById('modal-word-mastery').value = c.mastery;
+            } else {
+                document.getElementById('modal-word-title').textContent = '新規単語';
+                document.getElementById('modal-word-id').value = '';
+                document.getElementById('modal-word-front').value = '';
+                document.getElementById('modal-word-back').value = '';
+                document.getElementById('modal-word-genre').value = '';
+                document.getElementById('modal-word-mastery').value = '0';
+                
+                const curF = document.getElementById('manage-word-filter').value;
+                if(curF !== 'all') sel.value = curF;
+            }
+        }
+
+        function saveWord() {
+            const id = document.getElementById('modal-word-id').value;
+            const playlistId = document.getElementById('modal-word-playlist').value;
+            const front = document.getElementById('modal-word-front').value.trim();
+            const back = document.getElementById('modal-word-back').value.trim();
+            const genre = document.getElementById('modal-word-genre').value.trim();
+            const mastery = parseInt(document.getElementById('modal-word-mastery').value);
+
+            if(!front || !back) return showToast('単語と意味を入力してください');
+
+            if (id) {
+                const c = state.cards.find(x => x.id === id);
+                if(c) {
+                    c.playlistId = playlistId; c.front = front; c.back = back; c.genre = genre; c.mastery = mastery;
+                }
+                showToast('更新しました');
+            } else {
+                state.cards.push({ id: generateId(), playlistId, front, back, genre, mastery });
+                showToast('追加しました');
+            }
+            saveData();
+            closeModal('modal-word');
+            renderManageWords();
+        }
+
+        function reqDeleteWord(id) {
+            showConfirm('単語の削除', 'この単語を削除しますか？', () => {
+                state.cards = state.cards.filter(c => c.id !== id);
+                saveData();
+                renderManageWords();
+                showToast('削除しました');
+            });
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(`${modalId}-content`);
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        // --- 設定管理 ---
+        function setTheme(t) {
+            state.settings.theme = t;
+            saveData();
+            applySettings();
+            showToast(`${t.charAt(0).toUpperCase() + t.slice(1)} テーマを適用しました`);
+        }
+
+        function setFont(f) {
+            state.settings.font = f;
+            saveData();
+            applySettings();
+        }
+
+        function applySettings() {
+            document.body.className = document.body.className.replace(/theme-\w+/g, '').trim();
+            if (state.settings.theme !== 'light') {
+                document.body.classList.add(`theme-${state.settings.theme}`);
+            }
+            document.body.className = document.body.className.replace(/font-(sans|serif|rounded)/g, '').trim();
+            document.body.classList.add(state.settings.font, 'h-screen', 'flex', 'flex-col', 'overflow-hidden');
+            
+            // モバイル環境でのテーマカラーメタタグ更新 (PWAライクな挙動のため)
+            let metaTheme = document.querySelector('meta[name="theme-color"]');
+            if(!metaTheme) {
+                metaTheme = document.createElement('meta');
+                metaTheme.name = "theme-color";
+                document.head.appendChild(metaTheme);
+            }
+            const bgColors = { light: '#f3f4f6', dark: '#111827', pastel: '#fdf4f5', neon: '#09090b' };
+            metaTheme.content = bgColors[state.settings.theme] || '#f3f4f6';
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
