@@ -103,6 +103,8 @@
         .font-sans { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
         .font-serif { font-family: ui-serif, Georgia, Cambria, serif; }
         .font-rounded { font-family: 'Quicksand', 'Varela Round', system-ui, sans-serif; letter-spacing: 0.02em; }
+        .font-jp-gothic { font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; }
+        .font-jp-mincho { font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif; }
 
         /* =========================================
            3D フリップアニメーション
@@ -318,6 +320,14 @@
                         <span class="font-rounded font-medium">Friendly (Rounded)</span>
                         <input type="radio" name="font" value="font-rounded" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
                     </label>
+                    <label class="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--primary-light)] transition-colors">
+                        <span class="font-jp-gothic font-medium">日本語ゴシック</span>
+                        <input type="radio" name="font" value="font-jp-gothic" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
+                    </label>
+                    <label class="flex items-center justify-between p-4 rounded-xl border border-[var(--border)] cursor-pointer hover:bg-[var(--primary-light)] transition-colors">
+                        <span class="font-jp-mincho font-medium">日本語明朝</span>
+                        <input type="radio" name="font" value="font-jp-mincho" onchange="setFont(this.value)" class="w-5 h-5 accent-[var(--primary)]">
+                    </label>
                 </div>
             </div>
 
@@ -513,7 +523,8 @@
             if (!state.cards) state.cards = [];
             if (!state.settings) state.settings = { theme: 'light', font: 'font-sans' };
             if (!state.settings.theme) state.settings.theme = 'light';
-            if (!state.settings.font) state.settings.font = 'font-sans';
+            const supportedFonts = ['font-sans', 'font-serif', 'font-rounded', 'font-jp-gothic', 'font-jp-mincho'];
+            if (!supportedFonts.includes(state.settings.font)) state.settings.font = 'font-sans';
             if (!Array.isArray(state.settings.customThemes)) state.settings.customThemes = [];
             state.settings.customThemes = state.settings.customThemes
                 .filter(theme => theme && typeof theme.id === 'string' && typeof theme.name === 'string')
@@ -1135,7 +1146,7 @@
             } else if (state.settings.theme !== 'light') {
                 document.body.classList.add(`theme-${state.settings.theme}`);
             }
-            document.body.className = document.body.className.replace(/font-(sans|serif|rounded)/g, '').trim();
+            document.body.className = document.body.className.replace(/font-(sans|serif|rounded|jp-gothic|jp-mincho)/g, '').trim();
             document.body.classList.add(state.settings.font, 'h-screen', 'flex', 'flex-col', 'overflow-hidden');
             
             // モバイル環境でのテーマカラーメタタグ更新 (PWAライクな挙動のため)
