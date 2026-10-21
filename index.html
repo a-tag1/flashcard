@@ -168,10 +168,18 @@
                 <!-- フィルター -->
                 <div class="flex gap-3">
                     <select id="filter-mastery" onchange="applyFilters()" class="flex-1 input-styled rounded-xl p-2.5 text-sm appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');">
-                        <option value="all">全レベル</option>
-                        <option value="0">🔴 未学習</option>
-                        <option value="1">🟡 学習中</option>
-                        <option value="2">🟢 習得済</option>
+                        <option value="all">全習得率</option>
+                        <option value="0">0%</option>
+                        <option value="10">10%</option>
+                        <option value="20">20%</option>
+                        <option value="30">30%</option>
+                        <option value="40">40%</option>
+                        <option value="50">50%</option>
+                        <option value="60">60%</option>
+                        <option value="70">70%</option>
+                        <option value="80">80%</option>
+                        <option value="90">90%</option>
+                        <option value="100">100%</option>
                     </select>
                     <select id="filter-genre" onchange="applyFilters()" class="flex-1 input-styled rounded-xl p-2.5 text-sm appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%24%2024%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');">
                         <option value="all">全ジャンル</option>
@@ -192,7 +200,7 @@
                     <!-- 表面 -->
                     <div class="absolute inset-0 w-full h-full backface-hidden app-card flashcard-surface rounded-[2rem] flex flex-col items-center justify-center p-8 text-center">
                         <span id="card-genre" class="absolute top-6 left-6 text-xs font-bold px-3 py-1 rounded-full text-white" style="background-color: var(--primary);">Genre</span>
-                        <div class="absolute top-6 right-6 text-xl" id="card-front-mastery"></div>
+                        <div class="absolute top-6 right-6 text-xl font-bold px-3 py-1 rounded-full bg-[var(--primary-light)] text-[var(--primary)]" id="card-front-mastery"></div>
                         
                         <h2 id="card-front" class="text-4xl md:text-5xl font-bold mb-6 break-words w-full text-[var(--text-main)] leading-tight">Word</h2>
                         
@@ -208,14 +216,14 @@
                             <h3 id="card-back" class="text-3xl font-medium break-words w-full text-[var(--text-main)]">Meaning</h3>
                         </div>
                         
-                        <!-- 習得度ボタン -->
+                        <!-- 習得率スライダー -->
                         <div class="mt-auto pt-6 border-t border-[var(--border)]" onclick="event.stopPropagation()">
-                            <p class="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wider">Mastery Level</p>
-                            <div class="flex gap-2">
-                                <button onclick="setMastery(0)" id="btn-mastery-0" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-red-400 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">🔴 未学習</button>
-                                <button onclick="setMastery(1)" id="btn-mastery-1" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-yellow-400 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30">🟡 学習中</button>
-                                <button onclick="setMastery(2)" id="btn-mastery-2" class="flex-1 py-3 rounded-xl border-2 font-bold transition-all border-green-400 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30">🟢 習得済</button>
+                            <div class="flex items-center justify-between mb-3">
+                                <label for="study-mastery-slider" class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">習得率</label>
+                                <output id="study-mastery-value" for="study-mastery-slider" class="text-sm font-bold text-[var(--primary)]">0%</output>
                             </div>
+                            <input id="study-mastery-slider" type="range" min="0" max="100" step="10"
+                                oninput="setMastery(this.value)" aria-label="習得率" class="w-full accent-[var(--primary)] cursor-pointer">
                         </div>
                     </div>
                 </div>
@@ -414,12 +422,12 @@
                         <input type="text" id="modal-word-genre" class="w-full input-styled p-3 rounded-xl" placeholder="例: 動詞">
                     </div>
                     <div class="flex-1">
-                        <label class="block text-sm font-semibold mb-2 text-[var(--text-muted)]">習得度</label>
-                        <select id="modal-word-mastery" class="w-full input-styled p-3 rounded-xl appearance-none">
-                            <option value="0">🔴 未学習</option>
-                            <option value="1">🟡 学習中</option>
-                            <option value="2">🟢 習得済</option>
-                        </select>
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="modal-word-mastery" class="block text-sm font-semibold text-[var(--text-muted)]">習得率</label>
+                            <output id="modal-word-mastery-value" for="modal-word-mastery" class="text-sm font-bold text-[var(--primary)]">0%</output>
+                        </div>
+                        <input id="modal-word-mastery" type="range" min="0" max="100" step="10" value="0"
+                            oninput="updateWordMasteryValue(this.value)" aria-label="習得率" class="w-full accent-[var(--primary)] cursor-pointer">
                     </div>
                 </div>
             </div>
@@ -521,6 +529,7 @@
             if (!state) state = { playlists: [], cards: [], settings: {} };
             if (!state.playlists) state.playlists = [];
             if (!state.cards) state.cards = [];
+            state.cards.forEach(card => { card.mastery = normalizeMastery(card.mastery); });
             if (!state.settings) state.settings = { theme: 'light', font: 'font-sans' };
             if (!state.settings.theme) state.settings.theme = 'light';
             const supportedFonts = ['font-sans', 'font-serif', 'font-rounded', 'font-jp-gothic', 'font-jp-mincho'];
@@ -535,6 +544,14 @@
             }
             
             saveData();
+        }
+
+        function normalizeMastery(value) {
+            const numericValue = Number(value);
+            if (numericValue === 1) return 50;
+            if (numericValue === 2) return 100;
+            if (!Number.isFinite(numericValue)) return 0;
+            return Math.min(100, Math.max(0, Math.round(numericValue / 10) * 10));
         }
 
         function normalizeCustomThemeColors(colors) {
@@ -796,8 +813,9 @@
 
             state.playlists.forEach(pl => {
                 const cards = state.cards.filter(c => c.playlistId === pl.id);
-                const mastered = cards.filter(c => c.mastery === 2).length;
-                const progress = cards.length ? Math.round((mastered / cards.length) * 100) : 0;
+                const progress = cards.length
+                    ? Math.round(cards.reduce((total, card) => total + card.mastery, 0) / cards.length)
+                    : 0;
 
                 const el = document.createElement('div');
                 el.className = 'app-card p-5 rounded-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-transform';
@@ -839,7 +857,7 @@
             const gFilter = document.getElementById('filter-genre').value;
             
             let filtered = state.cards.filter(c => c.playlistId === studySession.activePlaylistId);
-            if (mFilter !== 'all') filtered = filtered.filter(c => c.mastery === parseInt(mFilter));
+            if (mFilter !== 'all') filtered = filtered.filter(c => c.mastery === parseInt(mFilter, 10));
             if (gFilter !== 'all') filtered = filtered.filter(c => c.genre === gFilter);
 
             studySession.filteredCards = filtered;
@@ -875,8 +893,7 @@
             if (card.genre) { genreEl.textContent = card.genre; genreEl.style.display = 'block'; } 
             else { genreEl.style.display = 'none'; }
 
-            const masteryIcons = ['🔴', '🟡', '🟢'];
-            document.getElementById('card-front-mastery').textContent = masteryIcons[card.mastery] || '🔴';
+            document.getElementById('card-front-mastery').textContent = `${card.mastery}%`;
             document.getElementById('study-progress').textContent = `${studySession.currentIndex + 1} / ${studySession.filteredCards.length}`;
 
             updateMasteryUI(card.mastery);
@@ -901,27 +918,25 @@
 
         function setMastery(level) {
             const card = studySession.filteredCards[studySession.currentIndex];
-            card.mastery = level;
+            const percentage = normalizeMastery(level);
+            card.mastery = percentage;
             
             const idx = state.cards.findIndex(c => c.id === card.id);
             if(idx !== -1) {
-                state.cards[idx].mastery = level;
+                state.cards[idx].mastery = percentage;
                 saveData();
             }
-            updateMasteryUI(level);
-            setTimeout(() => nextCard(), 300); 
+            updateMasteryUI(percentage);
         }
 
-        function updateMasteryUI(level) {
-            [0, 1, 2].forEach(i => {
-                const btn = document.getElementById(`btn-mastery-${i}`);
-                btn.classList.remove('bg-red-50', 'bg-yellow-50', 'bg-green-50', 'bg-red-900/30', 'bg-yellow-900/30', 'bg-green-900/30', 'ring-2');
-                if (i === level) {
-                    if(i===0) btn.classList.add(state.settings.theme === 'dark' ? 'bg-red-900/30' : 'bg-red-50', 'ring-2', 'ring-red-300');
-                    if(i===1) btn.classList.add(state.settings.theme === 'dark' ? 'bg-yellow-900/30' : 'bg-yellow-50', 'ring-2', 'ring-yellow-300');
-                    if(i===2) btn.classList.add(state.settings.theme === 'dark' ? 'bg-green-900/30' : 'bg-green-50', 'ring-2', 'ring-green-300');
-                }
-            });
+        function updateMasteryUI(percentage) {
+            document.getElementById('study-mastery-slider').value = percentage;
+            document.getElementById('study-mastery-value').textContent = `${percentage}%`;
+            document.getElementById('card-front-mastery').textContent = `${percentage}%`;
+        }
+
+        function updateWordMasteryValue(percentage) {
+            document.getElementById('modal-word-mastery-value').textContent = `${normalizeMastery(percentage)}%`;
         }
 
         // --- Playlists Management ---
@@ -1016,7 +1031,6 @@
             dCards.forEach(c => {
                 const pl = state.playlists.find(p => p.id === c.playlistId);
                 const plName = pl ? pl.name : 'Unknown';
-                const mIcon = c.mastery === 2 ? '🟢' : (c.mastery === 1 ? '🟡' : '🔴');
 
                 const el = document.createElement('div');
                 el.className = 'app-card p-4 rounded-2xl flex justify-between items-center gap-3';
@@ -1024,7 +1038,7 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex gap-2 items-center mb-2">
                             <span class="text-[10px] font-bold tracking-wider uppercase bg-[var(--border)] text-[var(--text-muted)] px-2 py-1 rounded truncate max-w-[100px]">${plName}</span>
-                            <span class="text-xs">${mIcon}</span>
+                            <span class="text-xs font-bold text-[var(--primary)]">${c.mastery}%</span>
                         </div>
                         <p class="font-bold text-lg text-[var(--text-main)] truncate">${c.front}</p>
                         <p class="text-sm font-medium text-[var(--text-muted)] truncate">${c.back}</p>
@@ -1063,6 +1077,7 @@
                 document.getElementById('modal-word-back').value = c.back;
                 document.getElementById('modal-word-genre').value = c.genre || '';
                 document.getElementById('modal-word-mastery').value = c.mastery;
+                updateWordMasteryValue(c.mastery);
             } else {
                 document.getElementById('modal-word-title').textContent = '新規単語';
                 document.getElementById('modal-word-id').value = '';
@@ -1070,6 +1085,7 @@
                 document.getElementById('modal-word-back').value = '';
                 document.getElementById('modal-word-genre').value = '';
                 document.getElementById('modal-word-mastery').value = '0';
+                updateWordMasteryValue(0);
                 
                 const curF = document.getElementById('manage-word-filter').value;
                 if(curF !== 'all') sel.value = curF;
@@ -1082,7 +1098,7 @@
             const front = document.getElementById('modal-word-front').value.trim();
             const back = document.getElementById('modal-word-back').value.trim();
             const genre = document.getElementById('modal-word-genre').value.trim();
-            const mastery = parseInt(document.getElementById('modal-word-mastery').value);
+            const mastery = normalizeMastery(document.getElementById('modal-word-mastery').value);
 
             if(!front || !back) return showToast('単語と意味を入力してください');
 
