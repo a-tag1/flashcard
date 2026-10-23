@@ -371,6 +371,17 @@
                 <p class="text-xs text-[var(--text-muted)]">設定は表面・裏面それぞれに適用され、保存されます。</p>
             </div>
 
+            <div class="app-card p-6 rounded-2xl space-y-4">
+                <div>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">バックアップ・データ移行</h3>
+                    <p class="text-xs text-[var(--text-muted)]">JSON形式でカードと設定を書き出します。自動バックアップは行いません。</p>
+                </div>
+                <button onclick="exportData()" class="w-full py-3 rounded-xl text-white font-semibold transition-opacity hover:opacity-90" style="background-color: var(--primary);">バックアップを書き出す</button>
+                <button onclick="document.getElementById('backup-file-input').click()" class="w-full py-3 rounded-xl border border-[var(--border)] font-semibold text-[var(--text-main)] hover:bg-[var(--primary-light)] transition-colors">バックアップを読み込む</button>
+                <input id="backup-file-input" type="file" accept=".json,application/json" class="hidden"
+                    onchange="importData(this.files[0]); this.value = '';" aria-label="読み込むバックアップファイルを選択">
+            </div>
+
             <div class="text-center pt-4">
                 <button onclick="confirmReset()" class="text-red-500 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                     全データを初期化
@@ -741,6 +752,80 @@
 
         function saveData() {
             localStorage.setItem('modernFlashcardApp', JSON.stringify(state));
+        }
+
+        function exportData() {
+            try {
+                const backup = {
+                    format: 'modern-flashcards-backup',
+                    version: 1,
+                    exportedAt: new Date().toISOString(),
+                    data: state
+                };
+                const file = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(file);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `flashcards-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showToast('バックアップを書き出しました');
+            } catch (error) {
+                console.error('Backup export failed:', error);
+                showToast('バックアップを書き出せませんでした');
+            }
+        }
+
+        async function importData(file) {
+            if (!file) return;
+
+            let backup;
+            try {
+                const contents = await file.text();
+                backup = JSON.parse(contents.replace(/^\uFEFF/, ''));
+            } catch (error) {
+                console.error('Backup file could not be read:', error);
+                showToast('JSONファイルを読み込めませんでした');
+                return;
+            }
+
+            if (!backup || backup.format !== 'modern-flashcards-backup' || backup.version !== 1 ||
+                !backup.data || !Array.isArray(backup.data.playlists) ||
+                !Array.isArray(backup.data.cards) ||
+                !backup.data.settings || typeof backup.data.settings !== 'object' ||
+                Array.isArray(backup.data.settings)) {
+                showToast('対応していないバックアップ形式です');
+                return;
+            }
+
+            const validSettings =
+                (backup.data.settings.theme === undefined ||
+                    ['light', 'dark', 'pastel', 'neon', 'custom'].includes(backup.data.settings.theme)) &&
+                (backup.data.settings.font === undefined ||
+                    ['font-sans', 'font-serif', 'font-rounded', 'font-jp-gothic', 'font-jp-mincho'].includes(backup.data.settings.font));
+            const validPlaylists = backup.data.playlists.every(playlist =>
+                playlist && typeof playlist.id === 'string' && typeof playlist.name === 'string');
+            const validCards = backup.data.cards.every(card =>
+                card && typeof card.id === 'string' && typeof card.playlistId === 'string' &&
+                typeof card.front === 'string' && typeof card.back === 'string' &&
+                (card.genre === undefined || typeof card.genre === 'string') &&
+                Number.isFinite(card.mastery));
+            if (!validSettings || !validPlaylists || !validCards) {
+                showToast('バックアップのデータ形式が正しくありません');
+                return;
+            }
+
+            showConfirm('バックアップの読み込み', '現在のカード、プレイリスト、設定はバックアップの内容に置き換わります。続行しますか？', () => {
+                try {
+                    localStorage.setItem('modernFlashcardApp', JSON.stringify(backup.data));
+                    location.reload();
+                } catch (error) {
+                    console.error('Backup import failed:', error);
+                    showToast('バックアップを保存できませんでした');
+                }
+            });
         }
 
         function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
