@@ -163,7 +163,12 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                         戻る
                     </button>
-                    <div class="px-3 py-1 rounded-full text-sm font-semibold app-card" id="study-progress">1 / 10</div>
+                    <div class="flex items-center gap-2">
+                        <button id="toggle-random" onclick="toggleRandomPlayback()" aria-label="ランダム再生を有効にする" aria-pressed="false" title="ランダム再生" class="p-2 rounded-full app-card hover:scale-110 active:scale-95 transition-transform text-[var(--text-muted)]">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 3h4v4M3 7h2c5 0 7 10 12 10h4m-4-4 4 4-4 4M3 17h2c1.5 0 2.7-1 4-2.5M17 7c.7-.7 1.4-1 2-1h2"></path></svg>
+                        </button>
+                        <div class="px-3 py-1 rounded-full text-sm font-semibold app-card" id="study-progress">1 / 10</div>
+                    </div>
                 </div>
                 <!-- フィルター -->
                 <div class="flex gap-3">
@@ -504,7 +509,7 @@
         let state = null;
         let customThemeDraft = { ...CUSTOM_THEME_DEFAULTS };
         let customThemeDraftId = null;
-        let studySession = { activePlaylistId: null, filteredCards: [], currentIndex: 0, isFlipped: false };
+        let studySession = { activePlaylistId: null, filteredCards: [], currentIndex: 0, isFlipped: false, isRandom: false };
 
         function init() {
             loadData();
@@ -860,6 +865,13 @@
             if (mFilter !== 'all') filtered = filtered.filter(c => c.mastery === parseInt(mFilter, 10));
             if (gFilter !== 'all') filtered = filtered.filter(c => c.genre === gFilter);
 
+            if (studySession.isRandom) {
+                for (let i = filtered.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+                }
+            }
+
             studySession.filteredCards = filtered;
             studySession.currentIndex = 0;
             studySession.isFlipped = false;
@@ -871,9 +883,16 @@
             const cardArea = document.getElementById('card-area');
             const noMsg = document.getElementById('no-cards-message');
             const flashcard = document.getElementById('flashcard');
-            
+            const randomButton = document.getElementById('toggle-random');
+
             flashcard.classList.remove('rotate-y-180');
             studySession.isFlipped = false;
+            randomButton.setAttribute('aria-pressed', String(studySession.isRandom));
+            randomButton.setAttribute('aria-label', `ランダム再生を${studySession.isRandom ? '無効' : '有効'}にする`);
+            randomButton.style.backgroundColor = studySession.isRandom ? 'var(--primary)' : '';
+            randomButton.style.borderColor = studySession.isRandom ? 'var(--primary)' : '';
+            randomButton.classList.toggle('text-white', studySession.isRandom);
+            randomButton.classList.toggle('text-[var(--text-muted)]', !studySession.isRandom);
 
             if (studySession.filteredCards.length === 0) {
                 cardArea.classList.add('hidden');
@@ -908,6 +927,11 @@
             if (studySession.filteredCards.length === 0) return;
             studySession.currentIndex = (studySession.currentIndex + 1) % studySession.filteredCards.length;
             renderStudyCard();
+        }
+
+        function toggleRandomPlayback() {
+            studySession.isRandom = !studySession.isRandom;
+            applyFilters();
         }
 
         function prevCard() {
