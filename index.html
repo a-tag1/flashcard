@@ -344,6 +344,29 @@
                 </div>
             </div>
 
+            <div class="app-card p-6 rounded-2xl space-y-5">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">カードの文字サイズ</h3>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="card-front-font-scale" class="text-sm font-medium">表面</label>
+                        <output id="card-front-font-scale-value" for="card-front-font-scale" class="text-sm font-bold text-[var(--primary)]">100%</output>
+                    </div>
+                    <input id="card-front-font-scale" type="range" min="75" max="150" step="5"
+                        oninput="setCardFontScale('front', this.value)" aria-label="カード表面の文字サイズ"
+                        class="w-full accent-[var(--primary)] cursor-pointer">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="card-back-font-scale" class="text-sm font-medium">裏面</label>
+                        <output id="card-back-font-scale-value" for="card-back-font-scale" class="text-sm font-bold text-[var(--primary)]">100%</output>
+                    </div>
+                    <input id="card-back-font-scale" type="range" min="75" max="150" step="5"
+                        oninput="setCardFontScale('back', this.value)" aria-label="カード裏面の文字サイズ"
+                        class="w-full accent-[var(--primary)] cursor-pointer">
+                </div>
+                <p class="text-xs text-[var(--text-muted)]">設定は表面・裏面それぞれに適用され、保存されます。</p>
+            </div>
+
             <div class="text-center pt-4">
                 <button onclick="confirmReset()" class="text-red-500 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                     全データを初期化
@@ -478,7 +501,7 @@
                 { id: 'c5', playlistId: 'p2', front: 'How\'s it going?', back: '調子はどう？', genre: '挨拶', mastery: 2 },
                 { id: 'c6', playlistId: 'p2', front: 'Make sense', back: '理にかなっている', genre: '熟語', mastery: 0 }
             ],
-            settings: { theme: 'light', font: 'font-sans' }
+            settings: { theme: 'light', font: 'font-sans', cardFrontFontScale: 100, cardBackFontScale: 100 }
         };
 
         const CUSTOM_THEME_DEFAULTS = {
@@ -539,6 +562,8 @@
             if (!state.settings.theme) state.settings.theme = 'light';
             const supportedFonts = ['font-sans', 'font-serif', 'font-rounded', 'font-jp-gothic', 'font-jp-mincho'];
             if (!supportedFonts.includes(state.settings.font)) state.settings.font = 'font-sans';
+            state.settings.cardFrontFontScale = normalizeCardFontScale(state.settings.cardFrontFontScale);
+            state.settings.cardBackFontScale = normalizeCardFontScale(state.settings.cardBackFontScale);
             if (!Array.isArray(state.settings.customThemes)) state.settings.customThemes = [];
             state.settings.customThemes = state.settings.customThemes
                 .filter(theme => theme && typeof theme.id === 'string' && typeof theme.name === 'string')
@@ -1172,6 +1197,33 @@
             applySettings();
         }
 
+        function normalizeCardFontScale(value) {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) return 100;
+            return Math.min(150, Math.max(75, Math.round(numericValue / 5) * 5));
+        }
+
+        function setCardFontScale(side, value) {
+            if (side !== 'front' && side !== 'back') return;
+            state.settings[`card${side === 'front' ? 'Front' : 'Back'}FontScale`] = normalizeCardFontScale(value);
+            applyCardFontSizes();
+            saveData();
+        }
+
+        function applyCardFontSizes() {
+            const frontScale = state.settings.cardFrontFontScale / 100;
+            const backScale = state.settings.cardBackFontScale / 100;
+            document.getElementById('card-front').style.fontSize =
+                `${(window.innerWidth >= 768 ? 48 : 36) * frontScale}px`;
+            document.getElementById('card-back').style.fontSize = `${30 * backScale}px`;
+
+            ['front', 'back'].forEach(side => {
+                const value = state.settings[`card${side === 'front' ? 'Front' : 'Back'}FontScale`];
+                document.getElementById(`card-${side}-font-scale`).value = value;
+                document.getElementById(`card-${side}-font-scale-value`).textContent = `${value}%`;
+            });
+        }
+
         function applySettings() {
             document.body.className = document.body.className.replace(/theme-\w+/g, '').trim();
             CUSTOM_THEME_COLORS.forEach(({ property }) => document.body.style.removeProperty(property));
@@ -1188,6 +1240,7 @@
             }
             document.body.className = document.body.className.replace(/font-(sans|serif|rounded|jp-gothic|jp-mincho)/g, '').trim();
             document.body.classList.add(state.settings.font, 'h-screen', 'flex', 'flex-col', 'overflow-hidden');
+            applyCardFontSizes();
             
             // モバイル環境でのテーマカラーメタタグ更新 (PWAライクな挙動のため)
             let metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -1203,6 +1256,7 @@
                 : (bgColors[state.settings.theme] || '#f3f4f6');
         }
 
+        window.addEventListener('resize', applyCardFontSizes);
         window.onload = init;
 
     </script>
