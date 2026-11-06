@@ -87,6 +87,7 @@
             --study-card-height: clamp(13rem, calc(100vh - 24rem - env(safe-area-inset-bottom)), 60vh);
             width: min(100%, calc(var(--study-card-height) * 0.75));
             height: var(--study-card-height);
+            touch-action: pan-y;
         }
 
         @supports (height: 100dvh) {
@@ -222,7 +223,8 @@
 
             <div id="card-area" class="flex-1 min-h-0 flex flex-col items-center justify-center perspective-1000 w-full max-w-md mx-auto">
                 <!-- 3Dカード本体 -->
-                <div id="flashcard" class="study-card relative max-w-full preserve-3d card-inner cursor-pointer" onclick="flipCard()">
+                <div id="card-motion" class="study-card relative max-w-full preserve-3d">
+                <div id="flashcard" class="w-full h-full relative preserve-3d card-inner cursor-pointer" onclick="flipCard()">
                     
                     <!-- 表面 -->
                     <div class="absolute inset-0 w-full h-full backface-hidden app-card flashcard-surface rounded-[2rem] flex flex-col items-center justify-center p-8 text-center">
@@ -253,6 +255,7 @@
                                 oninput="setMastery(this.value)" aria-label="習得率" class="w-full accent-[var(--primary)] cursor-pointer">
                         </div>
                     </div>
+                </div>
                 </div>
 
                 <!-- ナビゲーション -->
@@ -566,8 +569,11 @@
         let customThemeDraft = { ...CUSTOM_THEME_DEFAULTS };
         let customThemeDraftId = null;
         let studySession = { activePlaylistId: null, filteredCards: [], currentIndex: 0, isFlipped: false, isRandom: true };
+        let cardSwipeStart = null;
+        let suppressCardClick = false;
 
         function init() {
+            setupCardSwipe();
             loadData();
             renderCustomThemeEditor();
             applySettings();
@@ -1011,10 +1017,11 @@
             renderStudyCard();
         }
 
-        function renderStudyCard() {
+        function renderStudyCard(direction = 0) {
             const cardArea = document.getElementById('card-area');
             const noMsg = document.getElementById('no-cards-message');
             const flashcard = document.getElementById('flashcard');
+            const cardMotion = document.getElementById('card-motion');
             const randomButton = document.getElementById('toggle-random');
 
             flashcard.classList.remove('rotate-y-180');
@@ -1048,6 +1055,14 @@
             document.getElementById('study-progress').textContent = `${studySession.currentIndex + 1} / ${studySession.filteredCards.length}`;
 
             updateMasteryUI(card.mastery);
+
+            if (direction && typeof cardMotion.animate === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const startX = direction > 0 ? '24px' : '-24px';
+                cardMotion.animate([
+                    { opacity: 0.6, transform: `translateX(${startX})` },
+                    { opacity: 1, transform: 'translateX(0)' }
+                ], { duration: 220, easing: 'ease-out' });
+            }
         }
 
         function flipCard() {
@@ -1055,10 +1070,45 @@
             document.getElementById('flashcard').classList.toggle('rotate-y-180', studySession.isFlipped);
         }
 
+        function setupCardSwipe() {
+            const flashcard = document.getElementById('flashcard');
+
+            flashcard.addEventListener('pointerdown', event => {
+                if (!event.isPrimary || event.target.closest('button, input, select, textarea, a, label')) return;
+                cardSwipeStart = { x: event.clientX, y: event.clientY };
+            });
+
+            flashcard.addEventListener('pointerup', event => {
+                if (!cardSwipeStart) return;
+
+                const deltaX = event.clientX - cardSwipeStart.x;
+                const deltaY = event.clientY - cardSwipeStart.y;
+                cardSwipeStart = null;
+
+                if (Math.abs(deltaX) < 50 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+                suppressCardClick = true;
+                if (deltaX < 0) nextCard();
+                else prevCard();
+                setTimeout(() => { suppressCardClick = false; }, 500);
+            });
+
+            flashcard.addEventListener('pointercancel', () => {
+                cardSwipeStart = null;
+            });
+
+            flashcard.addEventListener('click', event => {
+                if (!suppressCardClick) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                suppressCardClick = false;
+            }, true);
+        }
+
         function nextCard() {
             if (studySession.filteredCards.length === 0) return;
             studySession.currentIndex = (studySession.currentIndex + 1) % studySession.filteredCards.length;
-            renderStudyCard();
+            renderStudyCard(1);
         }
 
         function toggleRandomPlayback() {
@@ -1069,7 +1119,7 @@
         function prevCard() {
             if (studySession.filteredCards.length === 0) return;
             studySession.currentIndex = (studySession.currentIndex - 1 + studySession.filteredCards.length) % studySession.filteredCards.length;
-            renderStudyCard();
+            renderStudyCard(-1);
         }
 
         function setMastery(level) {
